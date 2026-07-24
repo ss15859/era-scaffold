@@ -489,6 +489,10 @@ def _poisson_likelihood_test(forecast_data, observed_data, num_simulations=10000
         numpy.random.seed(seed)
 
     # used to determine where simulated earthquake should be placed, by definition of cumsum these are sorted
+    # float64 REQUIRED for the sampling CDF: with float32 forecasts the
+    # normalised cumulative weights can top out below 1.0 and searchsorted
+    # overruns the last cell (observed on causal_jrect_hm15b)
+    forecast_data = numpy.asarray(forecast_data, dtype=numpy.float64)
     sampling_weights = numpy.cumsum(forecast_data.ravel()) / numpy.sum(forecast_data)
 
     # data structures to store results
@@ -651,8 +655,9 @@ def compute_ll_model(lam_model: np.ndarray, n_obs: np.ndarray, eps: float) -> fl
     Computes the Poisson Log-Likelihood for the candidate model.
     LL_model = sum(n_obs * log(lambda_model) - lambda_model)
     """
-    # Rate floor: prevent ̈ = 0 → log(0)
-    lam_model = np.maximum(lam_model, eps)
+    # Rate floor: prevent ̈ = 0 → log(0). float64 so the metric is exact
+    # regardless of the (float32) storage dtype of the forecast series.
+    lam_model = np.maximum(np.asarray(lam_model, dtype=np.float64), eps)
     epsilon = 1e-9
 
     return (n_obs * np.log(lam_model + epsilon) - lam_model).sum()
@@ -795,7 +800,10 @@ def evaluate_fn(
         plot_cumulative_scores(eval_dates, daily_scores, daily_counts_model, daily_counts_obs, total_events, event_times, event_mags)
 
         # Pre-compute agg_forecasts
-        data_array = np.zeros_like(forecasts[forecasts.index[0]].data)
+        # float64 aggregate: this feeds pyCSEP's own consistency tests,
+        # whose sampling CDFs require it (see _poisson_likelihood_test)
+        data_array = np.zeros(forecasts[forecasts.index[0]].data.shape,
+                              dtype=np.float64)
         for day in forecasts.index[0:]:
             data_array += forecasts[day].data
 
