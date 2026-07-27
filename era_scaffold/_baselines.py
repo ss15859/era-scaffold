@@ -25,7 +25,12 @@ def load_etas_scores(filepath: str = "etas_baseline_scores.pkl") -> pd.Series:
     return pd.read_pickle(filepath)
 
 url = 'https://raw.githubusercontent.com/smousavi05/ll_etas/main/etas_baseline_scores.pkl'
-etas_filename = '/content/pycsep/pre-computed-ll-etas-scores.pkl'
+# Environment-agnostic path: Colab has /content, Kaggle has
+# /kaggle/working, headless runs have neither -- default to the current
+# working directory (the reproducibility repo at this point) and allow a
+# per-run override for concurrent headless jobs sharing that directory.
+etas_filename = os.environ.get('ERA_ETAS_SCORES_PATH',
+                               os.path.abspath('pre-computed-ll-etas-scores.pkl'))
 
 if os.path.exists(etas_filename):
     os.remove(etas_filename)
